@@ -1,55 +1,150 @@
-function doPost(e) {
-  try {
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-    let data;
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>School Maintenance Portal</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-100 font-sans min-h-screen p-4 md:p-8">
+  <div class="max-w-2xl mx-auto bg-white rounded-xl shadow-md overflow-hidden p-6 md:p-8">
+    <div class="border-b pb-4 mb-6">
+      <h1 class="text-2xl font-bold text-slate-800">School Maintenance Request</h1>
+      <p class="text-slate-500 text-sm">Submit maintenance issues directly to General Affairs.</p>
+    </div>
 
-    if (e.postData && e.postData.contents) {
-      data = JSON.parse(e.postData.contents);
-    } else {
-      throw new Error("No payload received");
+    <form id="maintenanceForm" class="space-y-6">
+      <div>
+        <label for="teacherName" class="block text-sm font-semibold text-slate-700 mb-1">Teacher Name *</label>
+        <input type="text" id="teacherName" required placeholder="e.g. Ms. Smith" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+      </div>
+
+      <div>
+        <label for="classroom" class="block text-sm font-semibold text-slate-700 mb-1">Classroom / Location *</label>
+        <input type="text" id="classroom" required placeholder="e.g. Room 204 / Library" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+      </div>
+
+      <div>
+        <label class="block text-sm font-semibold text-slate-700 mb-2">Urgency Level *</label>
+        <div class="grid grid-cols-3 gap-3">
+          <label class="cursor-pointer">
+            <input type="radio" name="urgency" value="Green" checked class="peer sr-only">
+            <div class="p-3 text-center border-2 rounded-lg peer-checked:border-emerald-500 peer-checked:bg-emerald-50 peer-checked:text-emerald-700 hover:bg-slate-50">
+              <span class="block text-xl">🟢</span>
+              <span class="text-xs font-bold block mt-1">Not Urgent</span>
+            </div>
+          </label>
+
+          <label class="cursor-pointer">
+            <input type="radio" name="urgency" value="Yellow" class="peer sr-only">
+            <div class="p-3 text-center border-2 rounded-lg peer-checked:border-amber-500 peer-checked:bg-amber-50 peer-checked:text-amber-700 hover:bg-slate-50">
+              <span class="block text-xl">🟡</span>
+              <span class="text-xs font-bold block mt-1">A Little Urgent</span>
+            </div>
+          </label>
+
+          <label class="cursor-pointer">
+            <input type="radio" name="urgency" value="Red" class="peer sr-only">
+            <div class="p-3 text-center border-2 rounded-lg peer-checked:border-rose-500 peer-checked:bg-rose-50 peer-checked:text-rose-700 hover:bg-slate-50">
+              <span class="block text-xl">🔴</span>
+              <span class="text-xs font-bold block mt-1">Very Urgent</span>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <div>
+        <label for="issue" class="block text-sm font-semibold text-slate-700 mb-1">What needs to be fixed? *</label>
+        <textarea id="issue" rows="4" required placeholder="Describe the issue in detail..." class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"></textarea>
+      </div>
+
+      <div>
+        <label for="photo" class="block text-sm font-semibold text-slate-700 mb-1">Attach Photo (Optional)</label>
+        <input type="file" id="photo" accept="image/*" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+      </div>
+
+      <button type="submit" id="submitBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg shadow-md transition-colors">
+        Submit Request
+      </button>
+    </form>
+  </div>
+
+  <script>
+    const WEB_APP_URL = "https://script.google.com/a/macros/wells-school.com/s/AKfycbyM6LRxihxyzgfI3tkeCllhFGyTt4_qa8caxR5vYHXK2MVRB3VcT-iHdpq2qifb-iEJ-w/exec";
+
+    function processImage(file) {
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (e) => {
+          const img = new Image();
+          img.src = e.target.result;
+          img.onload = () => {
+            const canvas = document.createElement("canvas");
+            const maxDim = 800; // Smaller resize max to keep payload light
+            let width = img.width;
+            let height = img.height;
+
+            if (width > height && width > maxDim) {
+              height *= maxDim / width;
+              width = maxDim;
+            } else if (height > maxDim) {
+              width *= maxDim / height;
+              height = maxDim;
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(img, 0, 0, width, height);
+            resolve(canvas.toDataURL("image/jpeg", 0.6));
+          };
+        };
+      });
     }
 
-    let photoUrl = "No Photo Uploaded";
+    document.getElementById("maintenanceForm").addEventListener("submit", async function (e) {
+      e.preventDefault();
+      
+      const submitBtn = document.getElementById("submitBtn");
+      submitBtn.disabled = true;
+      submitBtn.innerText = "Submitting...";
 
-    // Handle base64 photo upload if present
-    if (data.photoUrl && data.photoUrl.startsWith("data:image")) {
-      const folderName = "Maintenance Ticket Photos";
-      let folder;
-      const folders = DriveApp.getFoldersByName(folderName);
-      if (folders.hasNext()) {
-        folder = folders.next();
-      } else {
-        folder = DriveApp.createFolder(folderName);
+      let photoUrl = "No Photo Uploaded";
+      const photoInput = document.getElementById("photo");
+      if (photoInput.files.length > 0) {
+        try {
+          photoUrl = await processImage(photoInput.files[0]);
+        } catch (err) {
+          console.error("Photo compress error:", err);
+        }
       }
 
-      const contentType = data.photoUrl.substring(5, data.photoUrl.indexOf(";"));
-      const base64Data = data.photoUrl.substring(data.photoUrl.indexOf(",") + 1);
-      const bytes = Utilities.base64Decode(base64Data);
-      const blob = Utilities.newBlob(bytes, contentType, "photo_" + new Date().getTime() + ".jpg");
+      const payload = {
+        teacherName: document.getElementById("teacherName").value,
+        classroom: document.getElementById("classroom").value,
+        issue: document.getElementById("issue").value,
+        urgency: document.querySelector('input[name="urgency"]:checked').value,
+        photoUrl: photoUrl
+      };
 
-      const file = folder.createFile(blob);
-      file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-      photoUrl = file.getUrl();
-    }
+      try {
+        await fetch(WEB_APP_URL, {
+          method: "POST",
+          mode: "no-cors",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify(payload)
+        });
 
-    // Append submission row to Google Sheet
-    sheet.appendRow([
-      new Date(),       // Timestamp
-      data.teacherName, // Teacher Name
-      data.classroom,   // Classroom / Location
-      data.issue,       // Issue Description
-      data.urgency,     // Urgency
-      photoUrl,         // Photo Link
-      "Pending",        // Status
-      "",               // Assigned To
-      ""                // Notes / Resolution
-    ]);
-
-    return ContentService.createTextOutput(JSON.stringify({ status: "success" }))
-      .setMimeType(ContentService.MimeType.JSON);
-
-  } catch (error) {
-    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: error.toString() }))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
-}
+        alert("Request successfully submitted!");
+        document.getElementById("maintenanceForm").reset();
+      } catch (err) {
+        alert("Submission failed. Check network connection.");
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerText = "Submit Request";
+      }
+    });
+  </script>
+</body>
+</html>
