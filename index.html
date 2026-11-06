@@ -72,7 +72,7 @@
   <script>
     const WEB_APP_URL = "https://script.google.com/a/macros/wells-school.com/s/AKfycbyM6LRxihxyzgfI3tkeCllhFGyTt4_qa8caxR5vYHXK2MVRB3VcT-iHdpq2qifb-iEJ-w/exec";
 
-    // Heavy compression algorithm to guarantee payload fits within Google limits
+    // Compress photo strictly to max 400px & 30% quality to fit within URL-encoded POST limits
     function compressImage(file) {
       return new Promise((resolve) => {
         const reader = new FileReader();
@@ -82,7 +82,7 @@
           img.src = e.target.result;
           img.onload = () => {
             const canvas = document.createElement("canvas");
-            const maxDim = 500; // Small max dimension to keep string size low
+            const maxDim = 400;
             let width = img.width;
             let height = img.height;
 
@@ -98,7 +98,7 @@
             canvas.height = height;
             const ctx = canvas.getContext("2d");
             ctx.drawImage(img, 0, 0, width, height);
-            resolve(canvas.toDataURL("image/jpeg", 0.4)); // 40% quality compression
+            resolve(canvas.toDataURL("image/jpeg", 0.3));
           };
         };
       });
@@ -118,32 +118,32 @@
         try {
           photoData = await compressImage(photoInput.files[0]);
         } catch (err) {
-          console.error("Photo compression error:", err);
+          console.error("Compression error:", err);
         }
       }
 
       submitBtn.innerText = "Submitting...";
 
-      const payload = {
-        teacherName: document.getElementById("teacherName").value,
-        classroom: document.getElementById("classroom").value,
-        issue: document.getElementById("issue").value,
-        urgency: document.querySelector('input[name="urgency"]:checked').value,
-        photoData: photoData
-      };
+      // Send as URL-encoded body (bypasses CORS JSON preflight restrictions completely)
+      const formBody = new URLSearchParams();
+      formBody.append("teacherName", document.getElementById("teacherName").value);
+      formBody.append("classroom", document.getElementById("classroom").value);
+      formBody.append("issue", document.getElementById("issue").value);
+      formBody.append("urgency", document.querySelector('input[name="urgency"]:checked').value);
+      formBody.append("photoData", photoData);
 
       try {
         await fetch(WEB_APP_URL, {
           method: "POST",
           mode: "no-cors",
-          headers: { "Content-Type": "text/plain;charset=utf-8" },
-          body: JSON.stringify(payload)
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: formBody.toString()
         });
 
         alert("Request successfully submitted!");
         document.getElementById("maintenanceForm").reset();
       } catch (err) {
-        alert("Submission error. Please try again.");
+        alert("Submission error. Please check your network connection.");
       } finally {
         submitBtn.disabled = false;
         submitBtn.innerText = "Submit Request";
