@@ -7,7 +7,6 @@
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-100 font-sans min-h-screen p-4 md:p-8">
-  <!-- Hidden Iframe to handle cross-domain submission without CORS errors -->
   <iframe name="hidden_iframe" id="hidden_iframe" style="display:none;"></iframe>
 
   <div class="max-w-2xl mx-auto bg-white rounded-xl shadow-md overflow-hidden p-6 md:p-8">
@@ -118,20 +117,21 @@
       e.preventDefault();
       
       submitBtn.disabled = true;
-      submitBtn.innerText = "Submitting...";
-      submitted = true;
+      submitBtn.innerText = "Compressing photo...";
 
       if (photoInput.files.length > 0) {
         try {
           photoDataHidden.value = await processImage(photoInput.files[0]);
         } catch (err) {
-          console.error("Image compression failed:", err);
+          console.error("Image processing error:", err);
           photoDataHidden.value = "";
         }
       } else {
         photoDataHidden.value = "";
       }
 
+      submitBtn.innerText = "Submitting...";
+      submitted = true;
       form.submit();
     });
 
